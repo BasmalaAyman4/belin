@@ -1,0 +1,80 @@
+{
+  "header": {
+     "Logout":"Logout",
+    "Login":"Login",
+    "Wishlist":"Wishlist",
+    "Cart":"Cart",
+    "Cash Back":"Cash Back",
+    "Profile":"Profile",
+    "Searchforproducts":"Search for products"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "retry": "Try Again",
+    "viewAll": "View All",
+    "addToCart": "Add to Cart",
+    "addToFavorites": "Add to Favorites"
+  },
+  "auth": {
+    "welcomeBack": "Welcome Back",
+    "enterPhone": "Enter your phone number",
+    "enterPassword": "Enter your password",
+    "forgotPassword": "Forgot Password?",
+    "dontHaveAccount": "Don't have an account?",
+    "signUpNow": "Sign up now",
+    "or": "OR",
+    "continueWithOTP": "Continue with OTP",
+    "enterOTP": "Enter verification code",
+    "resendOTP": "Resend Code",
+    "verify": "Verify",
+    "completeProfile": "Complete Your Profile",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "email": "Email Address",
+    "continue": "Continue",  
+     "Show":"Show",
+    "Hide":"Hide",
+    "Getstarted":"Get started",
+      "Letsstartwith":"Let’s start with",
+    "yourmobilenumber":"your mobile number",
+        "Alreadyhadanaccount?":"Already had an account",
+    "Login":"Login",
+    "enteryourphonenumber":"Enter your phone number",
+    "SendOTP":"Send OTP",
+    "Pleaseverify":"Please verify",
+    "Verify Account":"Verify Account",
+        "Pleaseset":"Please set",
+    "yourpassword":"your password",
+    "password":"Password"
+  },
+  "product": {
+    "price": "Price",
+    "size": "Size",
+    "color": "Color",
+    "quantity": "Quantity",
+    "inStock": "In Stock",
+    "outOfStock": "Out of Stock",
+    "reviews": "Reviews",
+    "description": "Description",
+    "specifications": "Specifications",
+    "relatedProducts": "Related Products"
+  },
+  "cart": {
+    "title": "Shopping Cart",
+    "empty": "Your cart is empty",
+    "continueShopping": "Continue Shopping",
+    "subtotal": "Subtotal",
+    "shipping": "Shipping",
+    "tax": "Tax",
+    "total": "Total",
+    "checkout": "Proceed to Checkout"
+  },
+  "checkout": {
+    "title": "Checkout",
+    "shippingAddress": "Shipping Address",
+    "paymentMethod": "Payment Method",
+    "orderSummary": "Order Summary",
+    "placeOrder": "Place Order"
+  }
+}

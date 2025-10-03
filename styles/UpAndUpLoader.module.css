@@ -1,0 +1,265 @@
+/*
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  margin-top: 250px;
+}
+
+.bagWrapper {
+  position: relative;
+  margin-bottom: 1rem;
+  bottom: 0;
+}
+.bag__body{
+  position: relative;
+}
+
+.logo__body p{
+  position: absolute;
+top: 55%;
+left: 30%;
+z-index: 100;
+  font-size: 20px;
+  font-weight: 600;
+}
+.logo{
+position: absolute;
+top: 30%;
+left: 43%;
+z-index: 100;;
+width: 100px;
+height: 100px;
+
+}
+
+.bagSvg {
+  filter: drop-shadow(0 10px 8px rgb(0 0 0 / 0.04)) drop-shadow(0 4px 3px rgb(0 0 0 / 0.1));
+}
+
+.zipper {
+  position: absolute;
+  top: 2px;
+}
+
+.statusContainer {
+  text-align: center;
+}
+
+.statusTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.statusDescription {
+  color: #6b7280;
+  max-width: 28rem;
+  margin: 0 auto;
+} */
+ /* Container */
+.container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  margin-top: 190px;
+}
+
+.bagWrapper {
+  position: relative;
+}
+
+/* Makeup Bag */
+.makeupBag {
+  position: relative;
+width: 500px;
+  height: 310px;
+ background-image: url('../public/images/laj.png');
+  border-radius: 0.5rem;
+ background-position: center;
+ background-repeat: no-repeat;
+ background-size: cover;
+}
+
+
+
+/* Zipper */
+.zipperTrack {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 0.5rem;
+}
+
+.zipperTrackInner {
+  width: 100%;
+  height: 100%;
+}
+
+.zipperSlider {
+  position: absolute;
+  top: -47px;
+  left: 10px;
+  width: 120px;
+  height: 50px;
+  background-image: url('../public/images/z.png');
+  background-repeat: no-repeat;
+  background-size: contain;
+  z-index: 1000000;
+  cursor: pointer;
+}
+
+.zipperSliderInner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zipperSliderHandle {
+  width: 0.25rem;
+  height: 0.75rem;
+  border-radius: 9999px;
+}
+
+.zipperOpening {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background-color: #000000;
+  opacity: 0.6;
+}
+
+.bagInterior {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 310px;
+  background: linear-gradient(180deg, #f3e8ff 0%, #f3e8ff 100%);
+}
+
+/* Products */
+.productsContainer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.product {
+  position: absolute;
+  width: 4rem;
+  height: 5rem;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: -1;
+
+}
+
+.productShine {
+  position: absolute;
+  inset: 0;
+}
+
+.productCap {
+  position: absolute;
+  top: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2rem;
+  height: 0.75rem;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+
+
+.productTrail {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.5rem;
+  opacity:1;
+}
+
+
+
+.particle {
+  position: absolute;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  opacity: 1;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {Welcome To UP & UP
+
+
+  .container {
+    padding: 1rem;
+  }
+  
+  .makeupBag {
+    width: 20rem;
+    height: 12rem;
+  }
+  
+  .monogramLetter {
+    font-size: 3rem;
+  }
+  
+  .monogramName {
+    font-size: 1.875rem;
+  }
+  
+  .product {
+    width: 3rem;
+    height: 4rem;
+  }
+  
+  .productLabel {
+    font-size: 0.625rem;
+    padding: 0.125rem 0.5rem;
+  }
+}
+
+/* Hover Effects */
+.product:hover .productShine {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, transparent 100%);
+}
+
+.zipperSlider:hover {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Animation Keyframes */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.makeupBag {
+  animation: float 6s ease-in-out infinite;
+  z-index: 100;
+}
+
+/* Focus and Accessibility */
+.zipperSlider:focus {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 2px;
+}
+
