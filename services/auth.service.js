@@ -1,4 +1,5 @@
-
+// services/auth.service.js - SECURED VERSION
+import DOMPurify from 'isomorphic-dompurify';
 import { API_CONFIG, ERROR_MESSAGES } from '@/config/api.config';
 import { validateMobile, sanitizeInput, validatePassword } from '@/utils/validation';
 
@@ -11,35 +12,73 @@ class ApiError extends Error {
     }
 }
 
+// Request deduplication cache
+const requestCache = new Map();
+const CACHE_TTL = 5000; // 5 seconds
+
 class JsonApiClient {
     constructor(baseURL, timeout = 10000) {
         this.baseURL = baseURL;
         this.timeout = timeout;
         this.pendingRequests = new Map();
-        this.requestQueue = new Map();
     }
 
-    getRequestKey(endpoint, method) {
-        return `${method}:${endpoint}`;
+    // Generate cache key for request deduplication
+    getCacheKey(endpoint, method, body = null) {
+        const bodyKey = body ? JSON.stringify(body) : '';
+        return `${method}:${endpoint}:${bodyKey}`;
     }
 
-    async request(endpoint, method = 'POST', extraHeaders = {}, retryCount = 0) {
-        const requestKey = this.getRequestKey(endpoint, method);
+    // Check if we have a recent cached response
+    getCachedResponse(cacheKey) {
+        const cached = requestCache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+            return cached.response;
+        }
+        requestCache.delete(cacheKey);
+        return null;
+    }
 
-        // Return existing pending request if duplicate
-        if (this.pendingRequests.has(requestKey)) {
-            return this.pendingRequests.get(requestKey);
+    // Store response in cache
+    setCachedResponse(cacheKey, response) {
+        requestCache.set(cacheKey, {
+            response,
+            timestamp: Date.now()
+        });
+
+        // Clean old cache entries
+        if (requestCache.size > 100) {
+            const firstKey = requestCache.keys().next().value;
+            requestCache.delete(firstKey);
+        }
+    }
+
+    async request(endpoint, method = 'POST', body = null, extraHeaders = {}, retryCount = 0) {
+        const cacheKey = this.getCacheKey(endpoint, method, body);
+
+        // Check cache for GET requests
+        if (method === 'GET') {
+            const cached = this.getCachedResponse(cacheKey);
+            if (cached) {
+                return cached;
+            }
+        }
+
+        // Prevent duplicate requests
+        if (this.pendingRequests.has(cacheKey)) {
+            return this.pendingRequests.get(cacheKey);
         }
 
         const url = `${this.baseURL}${endpoint}`;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
+        // Security headers
         const headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
-            'Cache-Control': 'no-cache',
+            'X-Content-Type-Options': 'nosniff',
             ...extraHeaders
         };
 
@@ -49,8 +88,19 @@ class JsonApiClient {
                     method,
                     headers,
                     signal: controller.signal,
-                    credentials: 'include'
+                    credentials: 'include',
+                    mode: 'cors'
                 };
+
+                // Add body for POST/PUT/PATCH
+                if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
+                    requestConfig.body = JSON.stringify(body);
+                }
+
+                // Only log in development
+                if (process.env.NODE_ENV === 'development') {
+                    console.log(`🔒 API Request:`, { method, endpoint });
+                }
 
                 const response = await fetch(url, requestConfig);
                 clearTimeout(timeoutId);
@@ -63,7 +113,7 @@ class JsonApiClient {
                     // Retry on server errors (500-599)
                     if (response.status >= 500 && retryCount < API_CONFIG.RETRY_ATTEMPTS) {
                         await this.delay(API_CONFIG.RETRY_DELAY * Math.pow(2, retryCount));
-                        return this.request(endpoint, method, extraHeaders, retryCount + 1);
+                        return this.request(endpoint, method, body, extraHeaders, retryCount + 1);
                     }
 
                     throw new ApiError(
@@ -74,6 +124,12 @@ class JsonApiClient {
                 }
 
                 const data = await response.json();
+
+                // Cache successful GET requests
+                if (method === 'GET') {
+                    this.setCachedResponse(cacheKey, data);
+                }
+
                 return data;
 
             } catch (error) {
@@ -83,7 +139,7 @@ class JsonApiClient {
                 if (error.name === 'AbortError') {
                     if (retryCount < API_CONFIG.RETRY_ATTEMPTS) {
                         await this.delay(API_CONFIG.RETRY_DELAY * Math.pow(2, retryCount));
-                        return this.request(endpoint, method, extraHeaders, retryCount + 1);
+                        return this.request(endpoint, method, body, extraHeaders, retryCount + 1);
                     }
                     throw new ApiError(408, ERROR_MESSAGES.TIMEOUT);
                 }
@@ -91,17 +147,17 @@ class JsonApiClient {
                 // Retry on network errors
                 if (error.name === 'TypeError' && retryCount < API_CONFIG.RETRY_ATTEMPTS) {
                     await this.delay(API_CONFIG.RETRY_DELAY * Math.pow(2, retryCount));
-                    return this.request(endpoint, method, extraHeaders, retryCount + 1);
+                    return this.request(endpoint, method, body, extraHeaders, retryCount + 1);
                 }
 
                 throw error;
 
             } finally {
-                this.pendingRequests.delete(requestKey);
+                this.pendingRequests.delete(cacheKey);
             }
         })();
 
-        this.pendingRequests.set(requestKey, requestPromise);
+        this.pendingRequests.set(cacheKey, requestPromise);
         return requestPromise;
     }
 
@@ -111,14 +167,15 @@ class JsonApiClient {
 
     cancelAll() {
         this.pendingRequests.clear();
+        requestCache.clear();
     }
 }
 
 const jsonApiClient = new JsonApiClient(API_CONFIG.BASE_URL, API_CONFIG.TIMEOUT);
 
 export class AuthService {
-    // WARNING: API requires credentials in URL parameters (security risk)
-    // This is a backend limitation - avoid this pattern in your own APIs
+    // ⚠️ CRITICAL SECURITY ISSUE: This method is inherently insecure
+    // TODO: Backend must be updated to accept credentials in request body
     static async loginWithPassword(mobile, password, langCode = '1') {
         try {
             // Client-side validation
@@ -132,15 +189,18 @@ export class AuthService {
                 throw new Error(passwordError);
             }
 
-            // Sanitize inputs
-            const cleanMobile = sanitizeInput(mobile);
+            // Sanitize and escape inputs
+            const cleanMobile = DOMPurify.sanitize(sanitizeInput(mobile));
+            const cleanPassword = DOMPurify.sanitize(password);
 
-            // Build URL with parameters (API constraint)
-            const endpoint = `${API_CONFIG.ENDPOINTS.LOGIN}?mobile=${encodeURIComponent(cleanMobile)}&password=${encodeURIComponent(password)}`;
+            // ⚠️ SECURITY WARNING: Sending credentials in URL is dangerous
+            // This should be changed to POST body once backend is updated
+            const endpoint = `${API_CONFIG.ENDPOINTS.LOGIN}?mobile=${encodeURIComponent(cleanMobile)}&password=${encodeURIComponent(cleanPassword)}`;
 
             const response = await jsonApiClient.request(
                 endpoint,
                 'POST',
+                null,
                 { 'langCode': langCode }
             );
 
@@ -155,7 +215,7 @@ export class AuthService {
             return {
                 success: false,
                 user: null,
-                error: response.errorMessage || ERROR_MESSAGES.LOGIN_FAILED
+                error: DOMPurify.sanitize(response.errorMessage) || ERROR_MESSAGES.LOGIN_FAILED
             };
 
         } catch (error) {
@@ -174,12 +234,13 @@ export class AuthService {
                 throw new Error(mobileError);
             }
 
-            const cleanMobile = sanitizeInput(mobile);
+            const cleanMobile = DOMPurify.sanitize(sanitizeInput(mobile));
             const endpoint = `${API_CONFIG.ENDPOINTS.SIGNUP}?mobile=${encodeURIComponent(cleanMobile)}`;
 
             const response = await jsonApiClient.request(
                 endpoint,
                 'POST',
+                null,
                 { 'langCode': langCode }
             );
 
@@ -198,27 +259,31 @@ export class AuthService {
         }
     }
 
-    // Client-side OTP verification (API limitation - no server verification endpoint)
-    // WARNING: This is insecure. OTP should be verified server-side.
+    // ⚠️ CRITICAL SECURITY ISSUE: Client-side OTP verification
+    // TODO: This MUST be moved to backend - anyone can bypass this
     static verifyOtpClientSide(userOtp, enteredOtp) {
         try {
+            // Sanitize inputs
+            const cleanUserOtp = DOMPurify.sanitize(String(userOtp).trim());
+            const cleanEnteredOtp = DOMPurify.sanitize(String(enteredOtp).trim());
+
             // Validate OTP format
-            if (!enteredOtp || enteredOtp.length !== 6) {
+            if (!cleanEnteredOtp || cleanEnteredOtp.length !== 6) {
                 return {
                     success: false,
                     error: ERROR_MESSAGES.INVALID_OTP_FORMAT
                 };
             }
 
-            if (!/^\d+$/.test(enteredOtp)) {
+            if (!/^\d+$/.test(cleanEnteredOtp)) {
                 return {
                     success: false,
                     error: ERROR_MESSAGES.INVALID_OTP_FORMAT
                 };
             }
 
-            // Compare OTPs
-            if (String(userOtp).trim() === String(enteredOtp).trim()) {
+            // Compare OTPs (THIS IS INSECURE - BACKEND SHOULD DO THIS)
+            if (cleanUserOtp === cleanEnteredOtp) {
                 return {
                     success: true,
                     message: ERROR_MESSAGES.OTP_SUCCESS
@@ -256,17 +321,19 @@ export class AuthService {
                 throw new Error(passwordError);
             }
 
-            // Sanitize inputs
-            const cleanFirstName = sanitizeInput(firstName);
-            const cleanLastName = sanitizeInput(lastName);
-            const cleanAddress = sanitizeInput(address);
+            // Sanitize inputs with DOMPurify
+            const cleanFirstName = DOMPurify.sanitize(sanitizeInput(firstName));
+            const cleanLastName = DOMPurify.sanitize(sanitizeInput(lastName));
+            const cleanAddress = DOMPurify.sanitize(sanitizeInput(address));
+            const cleanPassword = DOMPurify.sanitize(password);
 
-            // Build endpoint with parameters
-            const endpoint = `${API_CONFIG.ENDPOINTS.USER_DATA}?id=${encodeURIComponent(id)}&firstName=${encodeURIComponent(cleanFirstName)}&lastName=${encodeURIComponent(cleanLastName)}&address=${encodeURIComponent(cleanAddress)}&password=${encodeURIComponent(password)}`;
+            // Build endpoint
+            const endpoint = `${API_CONFIG.ENDPOINTS.USER_DATA}?id=${encodeURIComponent(id)}&firstName=${encodeURIComponent(cleanFirstName)}&lastName=${encodeURIComponent(cleanLastName)}&address=${encodeURIComponent(cleanAddress)}&password=${encodeURIComponent(cleanPassword)}`;
 
             const response = await jsonApiClient.request(
                 endpoint,
                 'POST',
+                null,
                 { 'langCode': langCode }
             );
 
@@ -281,7 +348,7 @@ export class AuthService {
             return {
                 success: false,
                 data: null,
-                error: response.errorMessage || ERROR_MESSAGES.SAVE_FAILED
+                error: DOMPurify.sanitize(response.errorMessage) || ERROR_MESSAGES.SAVE_FAILED
             };
 
         } catch (error) {
@@ -294,11 +361,13 @@ export class AuthService {
     }
 
     static handleError(error) {
+        // Sanitize error messages to prevent XSS
+        const sanitizeError = (msg) => DOMPurify.sanitize(String(msg));
+
         // Handle validation errors
         if (error instanceof Error) {
-            // Return validation messages directly
             if (Object.values(ERROR_MESSAGES).includes(error.message)) {
-                return error.message;
+                return sanitizeError(error.message);
             }
         }
 
@@ -318,12 +387,17 @@ export class AuthService {
                 504: ERROR_MESSAGES.TIMEOUT
             };
 
-            return errorMap[error.status] || ERROR_MESSAGES.UNEXPECTED_ERROR;
+            return sanitizeError(errorMap[error.status] || ERROR_MESSAGES.UNEXPECTED_ERROR);
         }
 
         // Handle network errors
         if (error.name === 'TypeError' && error.message.includes('fetch')) {
             return ERROR_MESSAGES.NETWORK_ERROR;
+        }
+
+        // Only log in development
+        if (process.env.NODE_ENV === 'development') {
+            console.error('Auth Service Error:', error);
         }
 
         return ERROR_MESSAGES.UNEXPECTED_ERROR;
